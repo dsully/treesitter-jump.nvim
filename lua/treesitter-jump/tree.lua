@@ -49,9 +49,9 @@ end
 ---@param col integer
 ---@return TSNode|nil
 function M.get_node_at_pos(bufnr, row, col)
-    local parser = vim.treesitter.get_parser(bufnr)
+    local ok, parser = pcall(vim.treesitter.get_parser, bufnr)
 
-    if not parser then
+    if not ok or not parser then
         return nil
     end
 
