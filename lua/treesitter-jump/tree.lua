@@ -17,7 +17,7 @@ function M.is_keyword_node(node, bufnr)
     local text = vim.treesitter.get_node_text(node, bufnr)
 
     -- Check if it's a start keyword
-    if lang_pairs[text] then
+    if lang_pairs[text] ~= nil then
         return true
     end
 
@@ -51,7 +51,7 @@ end
 function M.get_node_at_pos(bufnr, row, col)
     local ok, parser = pcall(vim.treesitter.get_parser, bufnr)
 
-    if not ok or not parser then
+    if not ok or parser == nil then
         return nil
     end
 
@@ -61,7 +61,7 @@ function M.get_node_at_pos(bufnr, row, col)
         return nil
     end
 
-    local node = tree:root():descendant_for_range(row, col, row, col + 1)
+    local node = tree:root():descendant_for_range(row, col, row, col)
 
     while node do
         local text = vim.treesitter.get_node_text(node, bufnr)

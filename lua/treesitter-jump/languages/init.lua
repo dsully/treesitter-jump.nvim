@@ -27,19 +27,28 @@ function M.is_matching_pair(open, close)
     return config.bracket_pairs[open] == close
 end
 
+---@class BracketNode
+---@field node TSNode
+---@field row integer
+---@field col integer
+
 --- Handle matching brackets
 ---@param node TSNode
 ---@param bufnr integer
 function M.handle_brackets(node, bufnr)
     local text = vim.treesitter.get_node_text(node, bufnr)
     local root = node:tree():root()
+
+    ---@type BracketNode[]
     local brackets = {}
 
+    ---@param n TSNode
     local function collect_brackets(n)
         local t = vim.treesitter.get_node_text(n, bufnr)
 
         if vim.tbl_contains(config.brackets, t) then
-            table.insert(brackets, n)
+            local start_row, start_col = n:range()
+            table.insert(brackets, { node = n, row = start_row, col = start_col })
         end
 
         for child in n:iter_children() do
@@ -49,34 +58,48 @@ function M.handle_brackets(node, bufnr)
 
     collect_brackets(root)
 
+    -- Sort brackets by position (row first, then column)
+    table.sort(brackets, function(a, b)
+        return a.row < b.row or (a.row == b.row and a.col < b.col)
+    end)
+
     -- Find current bracket position
+    ---@type integer?
     local current_idx
 
-    for i, n in ipairs(brackets) do
-        if n == node then
+    local node_start_row, node_start_col = node:start()
+
+    -- Compare by position
+    for i, bracket in ipairs(brackets) do
+        local bracket_row, bracket_col = bracket.node:start()
+
+        if bracket_row == node_start_row and bracket_col == node_start_col then
             current_idx = i
             break
         end
     end
 
     if current_idx then
-        --
         if M.is_opening_bracket(text) then
             -- Search forward for matching closing bracket
             local depth = 1
 
             for i = current_idx + 1, #brackets do
-                local next_text = vim.treesitter.get_node_text(brackets[i], bufnr)
+                local bracket = brackets[i]
 
-                if next_text == text then
-                    depth = depth + 1
-                elseif M.is_matching_pair(text, next_text) then
-                    depth = depth - 1
+                if bracket ~= nil then
+                    local next_text = vim.treesitter.get_node_text(bracket.node, bufnr)
 
-                    if depth == 0 then
-                        local next_row, next_col = brackets[i]:range()
-                        vim.api.nvim_win_set_cursor(0, { next_row + 1, next_col })
-                        return
+                    if next_text == text then
+                        depth = depth + 1
+                    elseif M.is_matching_pair(text, next_text) then
+                        depth = depth - 1
+
+                        if depth == 0 then
+                            local next_row, next_col = bracket.node:range()
+                            vim.api.nvim_win_set_cursor(0, { next_row + 1, next_col })
+                            return
+                        end
                     end
                 end
             end
@@ -85,16 +108,21 @@ function M.handle_brackets(node, bufnr)
             local depth = 1
 
             for i = current_idx - 1, 1, -1 do
-                local prev_text = vim.treesitter.get_node_text(brackets[i], bufnr)
+                local bracket = brackets[i]
 
-                if prev_text == text then
-                    depth = depth + 1
-                elseif M.is_matching_pair(prev_text, text) then
-                    depth = depth - 1
-                    if depth == 0 then
-                        local next_row, next_col = brackets[i]:range()
-                        vim.api.nvim_win_set_cursor(0, { next_row + 1, next_col })
-                        return
+                if bracket ~= nil then
+                    local prev_text = vim.treesitter.get_node_text(bracket.node, bufnr)
+
+                    if prev_text == text then
+                        depth = depth + 1
+                    elseif M.is_matching_pair(prev_text, text) then
+                        depth = depth - 1
+
+                        if depth == 0 then
+                            local next_row, next_col = bracket.node:range()
+                            vim.api.nvim_win_set_cursor(0, { next_row + 1, next_col })
+                            return
+                        end
                     end
                 end
             end
@@ -110,7 +138,7 @@ end
 --- @param ft string
 function M.handle_language(node, bufnr, row, col, ft)
     --
-    if M.languages[ft] and M.languages[ft].handle_block then
+    if M.languages[ft] ~= nil and M.languages[ft].handle_block then
         if M.languages[ft].handle_block(node, bufnr, row, col) then
             return
         end
@@ -162,6 +190,4 @@ function M.handle_generic_language(node, bufnr, row, col)
     end
 end
 
-return setmetatable(M, {
-    __index = M.languages,
-})
+return M

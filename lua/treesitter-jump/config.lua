@@ -142,24 +142,21 @@ M.language_pairs = {
 }
 
 --- Setup function to configure language pairs and other settings
----@param opts table
+---@param opts treesitter-jump.Config
 function M.setup(opts)
     opts = opts or {}
 
-    if opts.language_pairs then
+    -- Merge user-defined language pairs
+    for lang, pairs in pairs(opts.language_pairs or {}) do
         --
-        -- Merge user-defined language pairs
-        for lang, pairs in pairs(opts.language_pairs) do
-            --
-            if M.language_pairs[lang] then
-                -- Merge existing language definitions
-                for keyword, data in pairs(pairs) do
-                    M.language_pairs[lang][keyword] = data
-                end
-            else
-                -- Add new language
-                M.language_pairs[lang] = pairs
+        if M.language_pairs[lang] ~= nil then
+            -- Merge existing language definitions
+            for keyword, data in pairs(pairs) do
+                M.language_pairs[lang][keyword] = data
             end
+        else
+            -- Add new language
+            M.language_pairs[lang] = pairs
         end
     end
 end
