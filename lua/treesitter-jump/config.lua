@@ -151,16 +151,16 @@ function M.setup(opts)
     opts = opts or {}
 
     -- Merge user-defined language pairs
-    for lang, pairs in pairs(opts.language_pairs or {}) do
+    for lang, lang_pairs in pairs(opts.language_pairs or {}) do
         --
         if M.language_pairs[lang] ~= nil then
             -- Merge existing language definitions
-            for keyword, data in pairs(pairs) do
+            for keyword, data in pairs(lang_pairs) do
                 M.language_pairs[lang][keyword] = data
             end
         else
             -- Add new language
-            M.language_pairs[lang] = pairs
+            M.language_pairs[lang] = lang_pairs
         end
     end
 
