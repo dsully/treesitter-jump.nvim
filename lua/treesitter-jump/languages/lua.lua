@@ -2,23 +2,21 @@ local M = {}
 
 local tree = require("treesitter-jump.tree")
 
+-- TODO: Is there a better way to get these type names?
+---@param n TSNode
+---@return boolean
+local function is_block_parent(n)
+    local type = n:type()
+    return type == "if_statement" or type == "function_definition"
+end
+
 --- Collect Lua block nodes
 --- @param start_node TSNode
 --- @param bufnr integer
 --- @return TSNode[]
 M.collect_block_nodes = function(start_node, bufnr)
     local nodes = {}
-    local parent = start_node:parent()
-
-    if not parent then
-        return nodes
-    end
-
-    -- Get either if_statement or function_declaration node
-    -- TODO: Is there a better way to get these type names?
-    while parent and not (parent:type() == "if_statement" or parent:type() == "function_definition") do
-        parent = parent:parent()
-    end
+    local parent = tree.find_ancestor(start_node, is_block_parent)
 
     if not parent then
         return nodes
@@ -27,46 +25,37 @@ M.collect_block_nodes = function(start_node, bufnr)
     local parent_type = parent:type()
 
     if parent_type == "if_statement" then
-        --
-        -- Collect nodes in order
-        for child in parent:iter_children() do
-            --
-            local text = vim.treesitter.get_node_text(child, bufnr)
+        -- Order is: if, else (inside else_statement), end
+        local elses, ends = {}, {}
+
+        for i = 0, parent:child_count() - 1 do
+            local child = parent:child(i)
+            local text = tree.short_text(child, bufnr, 4)
 
             if text == "if" then
                 table.insert(nodes, child)
-            end
-        end
-
-        -- Look for else inside else_statement
-        for child in parent:iter_children() do
-            --
-            if child:type() == "else_statement" then
-                --
-                for else_child in child:iter_children() do
-                    local text = vim.treesitter.get_node_text(else_child, bufnr)
-
-                    if text == "else" then
-                        table.insert(nodes, else_child)
+            elseif text == "end" then
+                table.insert(ends, child)
+            elseif child:type() == "else_statement" then
+                for j = 0, child:child_count() - 1 do
+                    local else_child = child:child(j)
+                    if tree.short_text(else_child, bufnr, 4) == "else" then
+                        table.insert(elses, else_child)
                         break
                     end
                 end
             end
         end
 
-        for child in parent:iter_children() do
-            local text = vim.treesitter.get_node_text(child, bufnr)
-
-            if text == "end" then
-                table.insert(nodes, child)
-            end
-        end
+        vim.list_extend(nodes, elses)
+        vim.list_extend(nodes, ends)
     elseif parent_type == "function_definition" then
         --
         -- For both regular and local functions
         local is_local = false
 
-        for child in parent:iter_children() do
+        for i = 0, parent:child_count() - 1 do
+            local child = parent:child(i)
             if child:type() == "local" then
                 is_local = true
                 break
@@ -74,7 +63,8 @@ M.collect_block_nodes = function(start_node, bufnr)
         end
 
         -- Find function and end nodes
-        for child in parent:iter_children() do
+        for i = 0, parent:child_count() - 1 do
+            local child = parent:child(i)
             if child:type() == "function" then
                 --
                 if is_local then

@@ -1,20 +1,19 @@
 local M = {}
 
+local tree = require("treesitter-jump.tree")
+
+---@param n TSNode
+---@return boolean
+local function is_statement(n)
+    return n:type():match("_statement$") ~= nil
+end
+
 --- Collect Python block nodes
 ---@param start_node TSNode
 ---@return TSNode[]
 function M.collect_block_nodes(start_node)
     local nodes = {}
-    local parent = start_node:parent()
-
-    if not parent then
-        return nodes
-    end
-
-    -- Get the statement node (if_statement, try_statement, etc.)
-    while parent and not parent:type():match("_statement$") do
-        parent = parent:parent()
-    end
+    local parent = tree.find_ancestor(start_node, is_statement)
 
     if not parent then
         return nodes
@@ -29,32 +28,33 @@ function M.collect_block_nodes(start_node)
             table.insert(nodes, if_keyword)
         end
 
-        -- Find elif clauses
-        for child in parent:iter_children() do
-            if child:type() == "elif_clause" then
+        -- elif clauses in order, then the first else clause
+        local else_keyword
+
+        for i = 0, parent:child_count() - 1 do
+            local child = parent:child(i)
+            local type = child:type()
+
+            if type == "elif_clause" then
                 local elif_keyword = child:child(0)
                 if elif_keyword then
                     table.insert(nodes, elif_keyword)
                 end
+            elseif type == "else_clause" and else_keyword == nil then
+                else_keyword = child:child(0) or false
             end
         end
 
-        -- Find else clause
-        for child in parent:iter_children() do
-            if child:type() == "else_clause" then
-                local else_keyword = child:child(0)
-                if else_keyword then
-                    table.insert(nodes, else_keyword)
-                end
-                break
-            end
+        if else_keyword then
+            table.insert(nodes, else_keyword)
         end
     elseif stmt_type == "try_statement" then
         -- Add try node
         table.insert(nodes, parent:child(0))
 
         -- Look for except, else, and finally clauses
-        for child in parent:iter_children() do
+        for i = 0, parent:child_count() - 1 do
+            local child = parent:child(i)
             local type = child:type()
 
             if type == "except_clause" or type == "finally_clause" or type == "else_clause" then
@@ -69,7 +69,8 @@ function M.collect_block_nodes(start_node)
         table.insert(nodes, parent:child(0))
 
         -- Look for else clause
-        for child in parent:iter_children() do
+        for i = 0, parent:child_count() - 1 do
+            local child = parent:child(i)
             if child:type() == "else_clause" then
                 local else_keyword = child:child(0)
                 if else_keyword then

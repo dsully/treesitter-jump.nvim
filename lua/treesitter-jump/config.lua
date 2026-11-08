@@ -141,6 +141,10 @@ M.language_pairs = {
     },
 }
 
+--- Bumped whenever setup() changes the tables above, so derived caches rebuild
+---@type integer
+M.generation = 0
+
 --- Setup function to configure language pairs and other settings
 ---@param opts treesitter-jump.Config
 function M.setup(opts)
@@ -159,6 +163,8 @@ function M.setup(opts)
             M.language_pairs[lang] = pairs
         end
     end
+
+    M.generation = M.generation + 1
 end
 
 return M

@@ -13,20 +13,19 @@ function M.jump()
     local bufnr = vim.api.nvim_get_current_buf()
     local cursor = vim.api.nvim_win_get_cursor(0)
     local row, col = cursor[1] - 1, cursor[2]
-    local ft = vim.bo[bufnr].filetype
+    local ft = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
 
-    local node = require("treesitter-jump.tree").get_node_at_pos(bufnr, row, col)
+    local node, text = require("treesitter-jump.tree").get_node_at_pos(bufnr, row, col)
 
     if not node then
         return
     end
 
-    local text = vim.treesitter.get_node_text(node, bufnr)
     local languages = require("treesitter-jump.languages")
 
     -- Handle brackets
-    if vim.tbl_contains(config.brackets, text) then
-        languages.handle_brackets(node, bufnr)
+    if require("treesitter-jump.tree").bracket_set()[text] then
+        languages.handle_brackets(node, bufnr, text)
         return
     end
 
