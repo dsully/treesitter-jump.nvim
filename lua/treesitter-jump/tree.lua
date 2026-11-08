@@ -160,7 +160,6 @@ function M.is_cursor_at_node(node, row, col)
     return row >= srow and row <= erow and col >= scol and col < ecol
 end
 
-
 ---@type table<TSNode, TSNode[]>
 local path_cache = setmetatable({}, { __mode = "k" })
 --- Nearest ancestor of node satisfying pred.

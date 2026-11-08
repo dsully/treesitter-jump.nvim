@@ -27,7 +27,6 @@ function M.is_matching_pair(open, close)
     return config.bracket_pairs[open] == close
 end
 
-
 --- Handle matching brackets
 ---@param node TSNode
 ---@param bufnr integer
